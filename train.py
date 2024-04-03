@@ -34,7 +34,7 @@ def get_transform(train):
     transforms = []
     if train:
         transforms.append(T.RandomHorizontalFlip(0.5))
-    transforms.append(T.Resize((450, 450), interpolation=InterpolationMode.BILINEAR))
+    transforms.append(T.Resize((512, 512), interpolation=InterpolationMode.BILINEAR))
     transforms.append(T.ToDtype(torch.float, scale=True))
     transforms.append(T.ToPureTensor())
     return T.Compose(transforms)
@@ -71,8 +71,8 @@ trainloader = torch.utils.data.DataLoader(train_dataset,
 """
 def calc_loss(outputs, low_res_label_batch, ce_loss, dice_loss, dice_weight:float=0.8):
     low_res_logits = outputs['masks']
-    #print(low_res_logits.shape)
-    #print(low_res_label_batch.shape)
+    print(low_res_logits.shape)
+    print(low_res_label_batch.shape)
     loss_ce = ce_loss(low_res_logits, low_res_label_batch)
     loss = loss_ce
     #loss_dice = dice_loss(low_res_logits, low_res_label_batch, softmax=True)
@@ -93,7 +93,7 @@ optimizer = torch.optim.SGD(params, lr=0.005, momentum=0.9, weight_decay=0.0005)
 5.5 Dealing with the mask problem
 """
 def pan_to_sem(label):
-    t = torch.empty(1, 5, 450, 450).int()
+    t = torch.empty(1, 5, 512, 512).int()
     masks = label['masks']
     masks = (masks != 0).int()
     classes = label['labels']
@@ -113,7 +113,7 @@ def pan_to_sem(label):
 """
 iter_num = 0
 max_epoch = 2
-img_size = 1024
+img_size = 512
 len_dataloader = len(trainloader)
 iterator = tqdm(range(max_epoch))
 multimask_output = True
