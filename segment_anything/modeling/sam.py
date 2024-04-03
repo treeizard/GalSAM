@@ -7,6 +7,7 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
+from icecream import ic
 
 from typing import Any, Dict, List, Tuple
 
@@ -50,8 +51,40 @@ class Sam(nn.Module):
     def device(self) -> Any:
         return self.pixel_mean.device
 
+    def forward(self, batched_input, multimask_output, image_size):
+        if isinstance(batched_input, list):
+            outputs = self.forward_test(batched_input, multimask_output)
+        else:
+            outputs = self.forward_train(batched_input, multimask_output, image_size)
+        return outputs
+
+    def forward_train(self, batched_input, multimask_output, image_size):
+        input_images = self.preprocess(batched_input)
+        image_embeddings = self.image_encoder(input_images)
+        sparse_embeddings, dense_embeddings = self.prompt_encoder(
+            points=None, boxes=None, masks=None
+        )
+        low_res_masks, iou_predictions = self.mask_decoder(
+            image_embeddings=image_embeddings,
+            image_pe=self.prompt_encoder.get_dense_pe(),
+            sparse_prompt_embeddings=sparse_embeddings,
+            dense_prompt_embeddings=dense_embeddings,
+            multimask_output=multimask_output
+        )
+        masks = self.postprocess_masks(
+            low_res_masks,
+            input_size=(image_size, image_size),
+            original_size=(image_size, image_size)
+        )
+        outputs = {
+            'masks': masks,
+            'iou_predictions': iou_predictions,
+            'low_res_logits': low_res_masks
+        }
+        return outputs
+
     @torch.no_grad()
-    def forward(
+    def forward_test(
         self,
         batched_input: List[Dict[str, Any]],
         multimask_output: bool,
@@ -85,8 +118,8 @@ class Sam(nn.Module):
           (list(dict)): A list over input images, where each element is
             as dictionary with the following keys.
               'masks': (torch.Tensor) Batched binary mask predictions,
-                with shape BxCxHxW, where B is the number of input prompts,
-                C is determined by multimask_output, and (H, W) is the
+                with shape BxCxHxW, where B is the number of input promts,
+                C is determiend by multimask_output, and (H, W) is the
                 original size of the image.
               'iou_predictions': (torch.Tensor) The model's predictions
                 of mask quality, in shape BxC.
@@ -172,3 +205,4 @@ class Sam(nn.Module):
         padw = self.image_encoder.img_size - w
         x = F.pad(x, (0, padw, 0, padh))
         return x
+

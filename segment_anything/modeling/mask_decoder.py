@@ -7,6 +7,7 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
+from icecream import ic
 
 from typing import List, Tuple, Type
 
@@ -26,7 +27,7 @@ class MaskDecoder(nn.Module):
     ) -> None:
         """
         Predicts masks given an image and prompt embeddings, using a
-        transformer architecture.
+        tranformer architecture.
 
         Arguments:
           transformer_dim (int): the channel dimension of the transformer
@@ -99,12 +100,12 @@ class MaskDecoder(nn.Module):
         )
 
         # Select the correct mask or masks for output
-        if multimask_output:
-            mask_slice = slice(1, None)
-        else:
-            mask_slice = slice(0, 1)
-        masks = masks[:, mask_slice, :, :]
-        iou_pred = iou_pred[:, mask_slice]
+        # if multimask_output:
+        #     mask_slice = slice(1, None)
+        # else:
+        #     mask_slice = slice(0, 1)
+        # masks = masks[:, mask_slice, :, :]
+        # iou_pred = iou_pred[:, mask_slice]
 
         # Prepare output
         return masks, iou_pred
@@ -139,9 +140,10 @@ class MaskDecoder(nn.Module):
         hyper_in_list: List[torch.Tensor] = []
         for i in range(self.num_mask_tokens):
             hyper_in_list.append(self.output_hypernetworks_mlps[i](mask_tokens_out[:, i, :]))
-        hyper_in = torch.stack(hyper_in_list, dim=1)
-        b, c, h, w = upscaled_embedding.shape
-        masks = (hyper_in @ upscaled_embedding.view(b, c, h * w)).view(b, -1, h, w)
+        hyper_in = torch.stack(hyper_in_list, dim=1)  # [b, c, token_num]
+
+        b, c, h, w = upscaled_embedding.shape  # [h, token_num, h, w]
+        masks = (hyper_in @ upscaled_embedding.view(b, c, h * w)).view(b, -1, h, w)  # [1, 4, 256, 256], 256 = 4 * 64, the size of image embeddings
 
         # Generate mask quality predictions
         iou_pred = self.iou_prediction_head(iou_token_out)

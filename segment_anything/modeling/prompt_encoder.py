@@ -56,7 +56,7 @@ class PromptEncoder(nn.Module):
             LayerNorm2d(mask_in_chans),
             activation(),
             nn.Conv2d(mask_in_chans, embed_dim, kernel_size=1),
-        )
+        )  # downsample to 1/4
         self.no_mask_embed = nn.Embedding(1, embed_dim)
 
     def get_dense_pe(self) -> torch.Tensor:
